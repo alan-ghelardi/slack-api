@@ -5,11 +5,9 @@
             [clojure.string :as string]
             [slack-api.misc :as misc]))
 
-(def read-open-api*
-  (comp json/read io/reader #(io/resource "open-api.json")))
-
 (def read-open-api
-  (memoize read-open-api*))
+  "Reads the Slack's Open API specification from the supplied path."
+  (comp json/read io/reader (partial io/file)))
 
 (def json-types->predicate-symbols
   "Map of JSON types to their equivalent Clojure predicate symbols."
@@ -19,19 +17,26 @@
    "string"  'string?})
 
 (defn- resolve-predicate-symbol
+  "Takes a JSON type (string, number, etc.) and returns its equivalent
+  Clojure predicate symbol."
   [json-type]
   (or (json-types->predicate-symbols json-type)
       (throw (IllegalArgumentException. (format "Unsupported JSON type `%s`" json-type)))))
 
-(def parameter-types->keywords
+(def req-parameter-types->keywords
+  "Map of request parameter types (such as form-data, header and query),
+  to their namespaced keywords (:slack.req/payload, :slack.req.headers
+  and :slack.req/query)."
   {"formData" :slack.req/payload
    "header"   :slack.req/headers
    "query"    :slack.req/query})
 
-(defn- resolve-parameter-group
-  [param-type]
-  (or (parameter-types->keywords param-type)
-      (throw (IllegalArgumentException. (format "Unknown parameter type `%s`" param-type)))))
+(defn- resolve-req-parameter
+  "Returns a namespaced keyword (such as :slack.req.payload) for the
+  parameter type (such as form-data) in question."
+  [parameter-type]
+  (or (req-parameter-types->keywords parameter-type)
+      (throw (IllegalArgumentException. (format "Unknown parameter type `%s`" parameter-type)))))
 
 (defn- parse-parameters
   [parameters]
@@ -42,15 +47,16 @@
                           :pred        (resolve-predicate-symbol type)}))
           {} parameters))
 
-(defn- parse-request-parameters
+(defn parse-request-parameters
   [parameters]
   (->> parameters
        (group-by :in)
        (map (fn [[name parameters]]
-              [(resolve-parameter-group name) (parse-parameters parameters)]))
+              [(resolve-req-parameter name) (parse-parameters parameters)]))
        (into {})))
 
-(defn- parse-slack-methods [url methods]
+(defn- parse-slack-methods
+  [url methods]
   (->> methods
        misc/dasherize-keys
        (map (fn [[verb slack-method]]
@@ -98,7 +104,8 @@
                  (parse-slack-methods (url (assoc url-components :path path)) methods)]))
          (into {}))))
 
-(defn parse-web-api [open-api]
+(defn parse-web-api
+  [open-api]
   #:slack.api{:version (get-in open-api ["info" "version"])
               :methods (parse-paths open-api)})
 
@@ -107,5 +114,9 @@
   (spit dest
         (pr-str web-api)))
 
-(comment
-  (write-web-api  (parse-web-api (read-open-api)) (io/file "resources/slack_api/web-api.edn")))
+(defn -main
+  "Reads the supplied Open API specification, converts it into an
+  internal data structure and writes the resulting EDN to the
+  resources path."
+  [& [open-api-file]]
+  (write-web-api  (parse-web-api (read-open-api open-api-file)) (io/file "resources/slack_api/web-api.edn")))
