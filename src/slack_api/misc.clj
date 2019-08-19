@@ -3,8 +3,8 @@
             [clojure.walk :as walk]))
 
 (def kebab-case
-  "Converts a string in snake case to kebap case."
-  (comp #(string/replace % #"_" "-") string/lower-case))
+  "Converts a string in camel or snake case to kebap case."
+  (comp string/lower-case #(string/replace % #"([a-z])([A-Z])|_+" "$1-$2")))
 
 (def snake-case
   "Converts a string in kebab case to snake case."
@@ -18,6 +18,8 @@
                       (dasherize %)) m)))
 
 (defn map-vals
+  "Applies the function f to each value in the map m and return the
+  resulting map."
   [f m]
   (into {} (map (fn [[k v]]
                   [k (f v)]) m)))
