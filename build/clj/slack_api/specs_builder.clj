@@ -4,7 +4,7 @@
             [clojure.string :as string]
             [slack-api.misc :as misc]
             [slack-api.web-api :as web-api])
-  (:import (java.io StringWriter)))
+  (:import java.io.StringWriter))
 
 (defn- wrap-in-schema-form
   "Wraps each request parameter in a s/schema form."
@@ -56,7 +56,3 @@
       (write-form writer (ns-form ns-symbol doc-string))
       (run! (partial write-form writer) spec-forms))
     (-> string-writer .getBuffer str)))
-
-(comment
-  (gen-specs-ns 'slack-api.specs.request
-                (build-schema-forms (web-api/get-slack-methods))))
