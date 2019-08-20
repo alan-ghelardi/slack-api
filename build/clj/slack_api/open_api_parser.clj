@@ -116,15 +116,3 @@
   [open-api]
   #:slack.api{:version (get-in open-api ["info" "version"])
               :methods (parse-paths open-api)})
-
-(defn write-web-api
-  [web-api dest]
-  (spit dest
-        (pr-str web-api)))
-
-#_(defn -main
-    "Reads the supplied Open API specification, converts it into an
-  internal data structure and writes the resulting EDN to the
-  resources path."
-    [& [open-api-file]]
-    (write-web-api  (parse-web-api (read-open-api open-api-file)) (io/file "resources/slack_api/web-api.edn")))
