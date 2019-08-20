@@ -1,14 +1,14 @@
 (ns slack-api.misc-test
-  (:require [slack-api.misc :as misc]
-            [clojure.test :refer :all]))
+  (:require [clojure.test :refer :all]
+            [slack-api.misc :as misc]))
 
 (deftest kebab-case-test
   (are [value result] (= result (misc/kebab-case value))
-    "first-name"    "first-name"
-    "first_name"    "first-name"
-    "FIRST_NAME"    "first-name"
-    "my_first_name" "my-first-name"
-    "setTopic" "set-topic"
+    "first-name"       "first-name"
+    "first_name"       "first-name"
+    "FIRST_NAME"       "first-name"
+    "my_first_name"    "my-first-name"
+    "setTopic"         "set-topic"
     "setActiveChannel" "set-active-channel"))
 
 (deftest snake-case-test
@@ -25,8 +25,14 @@
   (is (= "my_first_name"
          (misc/snake-case (misc/kebab-case "my_first_name")))))
 
+(deftest dasherize-keys-test
+  (is (= {:relevant-channels [{:name-normalized "channel1"}
+                              {:name-normalized "channel2"}]}
+         (misc/dasherize-keys {"relevant_channels" [{"name_normalized" "channel1"}
+                                                    {"name_normalized" "channel2"}]}))))
+
 (deftest map-vals-test
   (are [map result] (= result (misc/map-vals inc map))
-    {} {}
-    {:a 1} {:a 2}
+    {}          {}
+    {:a 1}      {:a 2}
     {:a 1 :b 2} {:a 2 :b 3}))

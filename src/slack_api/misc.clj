@@ -10,7 +10,10 @@
   "Converts a string in kebab case to snake case."
   (comp #(string/replace % #"-" "_") string/lower-case))
 
-(defn dasherize-keys [m]
+(defn dasherize-keys
+  "Recursively applies the kebab-case function to all keys of the map
+  m."
+  [m]
   (letfn [(dasherize [[k v]]
             [(keyword (kebab-case k)) v])]
     (walk/postwalk #(if-not (map-entry? %)
