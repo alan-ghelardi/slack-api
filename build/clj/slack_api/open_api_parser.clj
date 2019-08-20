@@ -1,12 +1,11 @@
-(ns slack-api.parser
+(ns slack-api.open-api-parser
   (:require [clojure.data.json :as json]
-            [clojure.set :as set]
             [clojure.java.io :as io]
             [clojure.string :as string]
             [slack-api.misc :as misc]))
 
 (def read-open-api
-  "Reads the Slack's Open API specification from the supplied path."
+  "Reads the Slack's OpenAPI specification from the supplied path."
   (comp json/read io/reader (partial io/file)))
 
 (def json-types->predicate-symbols
@@ -23,49 +22,49 @@
   (or (json-types->predicate-symbols json-type)
       (throw (IllegalArgumentException. (format "Unsupported JSON type `%s`" json-type)))))
 
-(def req-parameter-types->keywords
+(def req-parameter-types->qualified-keywords
   "Map of request parameter types (such as form-data, header and query),
-  to their namespaced keywords (:slack.req/payload, :slack.req.headers
+  to their qualified keywords (:slack.req/payload, :slack.req.headers
   and :slack.req/query)."
   {"formData" :slack.req/payload
    "header"   :slack.req/headers
    "query"    :slack.req/query})
 
-(defn- resolve-req-parameter
-  "Returns a namespaced keyword (such as :slack.req.payload) for the
+(defn- resolve-req-qualified-key
+  "Returns a qualified keyword (such as :slack.req.payload) for the
   parameter type (such as form-data) in question."
   [parameter-type]
-  (or (req-parameter-types->keywords parameter-type)
+  (or (req-parameter-types->qualified-keywords parameter-type)
       (throw (IllegalArgumentException. (format "Unknown parameter type `%s`" parameter-type)))))
 
-(defn- parse-parameters
+(defn- parse-request-parameters
+  "Converts the request parameters to their internal representation."
   [parameters]
-  (reduce (fn [result {:keys [description name type]}]
-            (assoc result
-                   (keyword (misc/kebab-case name))
-                   #:doc{:description description
-                          :pred        (resolve-predicate-symbol type)}))
-          {} parameters))
+  (let [parse-parameters #(reduce (fn [result {:keys [description name type]}]
+                                    (assoc result
+                                           (keyword (misc/kebab-case name))
+                                           #:doc{:description description
+                                                 :pred        (resolve-predicate-symbol type)}))
+                                  {} %)]
+    (->> parameters
+         (group-by :in)
+         (map (fn [[name parameters]]
+                [(resolve-req-qualified-key name) (parse-parameters parameters)]))
+         (into {}))))
 
-(defn parse-request-parameters
-  [parameters]
-  (->> parameters
-       (group-by :in)
-       (map (fn [[name parameters]]
-              [(resolve-req-parameter name) (parse-parameters parameters)]))
-       (into {})))
-
-(defn- parse-slack-methods
-  [url methods]
-  (->> methods
+(defn- parse-slack-endpoints
+  "Takes an URL and, possibly, a set of existing Slack endpoints, and
+  convert them to their internal representation."
+  [url endpoints]
+  (->> endpoints
        misc/dasherize-keys
-       (map (fn [[verb slack-method]]
-              (let [{:keys [description tags externaldocs security consumes produces parameters]}
-                    slack-method
+       (map (fn [[verb endpoint]]
+              (let [{:keys [description tags external-docs security consumes produces parameters]}
+                    endpoint
                     request-params (parse-request-parameters parameters)]
-                (merge {:doc/description         description
-                        :doc/tags                (set tags)
-                        :doc/link                (:url externaldocs)
+                (merge {:doc/description          description
+                        :doc/tags                 (set tags)
+                        :doc/link                 (:url external-docs)
                         :endpoint/url             url
                         :endpoint/verb            verb
                         :endpoint/required-scopes (set (flatten (map vals security)))
@@ -83,7 +82,9 @@
   "Turns a relative path into a namespaced keyword representing a Slack
   method."
   [path]
-  (let [parts (remove string/blank? (string/split path #"/|\."))]
+  (let [parts (->> (string/split path #"/|\.")
+                   (remove string/blank?)
+                   (map misc/kebab-case))]
     (keyword (str (string/join "." (butlast parts))
                   "/" (last parts)))))
 
@@ -95,16 +96,23 @@
    :host      (get open-api "host")
    :base-path (get open-api "basePath")})
 
-(defn parse-paths
+(defn- parse-paths
+  "Converts the `paths` property of the supplied OpenAPI object to a map
+  of Slack methods."
   [open-api]
   (let [url-components (url-components open-api)]
     (->> (get open-api "paths")
-         (map (fn [[path methods]]
+         (map (fn [[path endpoints]]
                 [(path->slack-method path)
-                 (parse-slack-methods (url (assoc url-components :path path)) methods)]))
+                 (parse-slack-endpoints (url (assoc url-components :path path)) endpoints)]))
          (into {}))))
 
-(defn parse-web-api
+(defn parse
+  "Parses the OpenAPI object and converts it to a Web API descriptor in
+  the EDN format.
+
+  The resulting data structure contains a set of attributes that will
+  be read in runtime by `slack-api.web-api` namespace."
   [open-api]
   #:slack.api{:version (get-in open-api ["info" "version"])
               :methods (parse-paths open-api)})
@@ -114,9 +122,9 @@
   (spit dest
         (pr-str web-api)))
 
-(defn -main
-  "Reads the supplied Open API specification, converts it into an
+#_(defn -main
+    "Reads the supplied Open API specification, converts it into an
   internal data structure and writes the resulting EDN to the
   resources path."
-  [& [open-api-file]]
-  (write-web-api  (parse-web-api (read-open-api open-api-file)) (io/file "resources/slack_api/web-api.edn")))
+    [& [open-api-file]]
+    (write-web-api  (parse-web-api (read-open-api open-api-file)) (io/file "resources/slack_api/web-api.edn")))
