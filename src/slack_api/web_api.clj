@@ -4,7 +4,7 @@
             [clojure.spec-alpha2 :as s]
             [slack-api.misc :as misc]))
 
-(def descriptor "slack_api/web-api.edn")
+(def descriptor "slack_api/web_api.edn")
 
 (def read-web-api*
   (comp edn/read-string slurp io/resource))
