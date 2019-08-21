@@ -1,18 +1,23 @@
 (ns slack-api.web-api
+  "Internal bridge to interact with the web_api descriptor file."
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.spec-alpha2 :as s]
             [slack-api.misc :as misc]))
 
-(def descriptor "slack_api/web_api.edn")
+(def descriptor
+  "The EDN file that describes all Slack methods."
+  "slack_api/web_api.edn")
 
-(def read-web-api*
+(def ^:private read-web-api*
   (comp edn/read-string slurp io/resource))
 
 (def read-web-api
+  "Memoized reader for the web_api.edn descriptor."
   (memoize read-web-api*))
 
 (defn get-api-version
+  "Returns the current version of Slack Web API."
   []
   (get (read-web-api descriptor) :slack.api/version))
 
@@ -20,6 +25,8 @@
   :ret string?)
 
 (defn get-slack-methods
+  "Returns a map containing all known Slack methods along with their
+  descriptors."
   []
   (get (read-web-api descriptor) :slack.api/methods))
 
@@ -41,20 +48,31 @@
 (s/fdef get-slack-methods
   :ret (s/map-of :slack/method :slack/method-descriptor))
 
-(defn spec-name [method]
+(defn spec-name
+  "Given a qualified keyword representing a Slack method, returns the
+  corresponding spec name."
+  [method]
   (let [the-namespace (namespace method)
         the-name      (name method)]
     (keyword (str "slack." the-namespace "." the-name "/" "req"))))
 
-(defn- resolve-multi-spec [method]
+(s/fdef spec-name
+  :args (s/cat :method :slack/method)
+  :ret keyword?)
+
+(defn- resolve-request-spec
+  "Given a qualified keyword representing a Slack method, returns the
+  corresponding request spec object."
+  [method]
   (require 'slack-api.specs.request)
   (s/get-spec (spec-name method)))
 
 (defmulti method-data :slack/method)
 
+;; Dynamically add multi-methods for each Slack method.
 (doseq [method slack-methods]
     (. method-data addMethod method
-       (fn [_] (resolve-multi-spec method))))
+       (fn [_] (resolve-request-spec method))))
 
 (s/def :slack/method-data (s/multi-spec method-data :slack/method))
 

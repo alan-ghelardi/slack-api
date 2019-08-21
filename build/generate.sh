@@ -6,7 +6,7 @@ set -euo pipefail
 # OpenAPI specification provided by Slack.
 ###
 
-open_api_spec=target/slack_web.json
+open_api_spec=target/slack_web_openapi_v2.json
 
 mkdir -p $(dirname $open_api_spec)
 
@@ -15,6 +15,6 @@ curl \
     --fail \
     --retry 3 \
     --output $open_api_spec \
-    https://api.slack.com/specs/openapi/v2/slack_web.json
+    https://raw.githubusercontent.com/slackapi/slack-api-specs/master/web-api/slack_web_openapi_v2.json \
 
-clojure -Abuild -m slack-api.gen $open_api_spec
+    clojure -Abuild -m slack-api.gen $open_api_spec
