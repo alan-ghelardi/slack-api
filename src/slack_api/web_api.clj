@@ -3,7 +3,8 @@
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.spec-alpha2 :as s]
-            [slack-api.misc :as misc]))
+            [slack-api.misc :as misc]
+            [clojure.set :as set]))
 
 (def descriptor
   "The EDN file that describes all Slack methods."
@@ -38,25 +39,26 @@
 (s/def :endpoint/url string?)
 (def http-verbs (set (vals (misc/map-vals :endpoint/verb (get-slack-methods)))))
 (s/def :endpoint/verb http-verbs)
-(s/def :endpoint/required-scopes (s/coll-of string? :kind set?))
-(def consumed-media-types (set (flatten (vals (misc/map-vals :endpoint/consumes (get-slack-methods))))))
-(def produced-media-types (set (flatten (vals (misc/map-vals :endpoint/produces (get-slack-methods))))))
-(s/def :endpoint/consumes (s/coll-of consumed-media-types :kind set?))
-(s/def :endpoint/produces (s/coll-of produced-media-types :kind set?))
+(s/def :endpoint/required-scopes (s/coll-of string? :kind set? :min-count 1))
+(def consumed-media-types (apply set/union (vals (misc/map-vals :endpoint/consumes (get-slack-methods)))))
+(def produced-media-types (apply set/union (vals (misc/map-vals :endpoint/produces (get-slack-methods)))))
+(s/def :endpoint/consumes (s/coll-of consumed-media-types :kind set? :min-count 1))
+(s/def :endpoint/produces (s/coll-of produced-media-types :kind set? :min-count 1))
 (s/def :slack/method-descriptor (s/keys :req [:doc/description :doc/tags :doc/link
                                               :endpoint/url :endpoint/verb :endpoint/required-scopes :endpoint/consumes :endpoint/produces]))
+(s/def :slack/methods (s/map-of :slack/method :slack/method-descriptor))
 (s/fdef get-slack-methods
-  :ret (s/map-of :slack/method :slack/method-descriptor))
+  :ret :slack/methods)
 
-(defn spec-name
+(defn req-spec-name
   "Given a qualified keyword representing a Slack method, returns the
-  corresponding spec name."
+  corresponding request spec name."
   [method]
   (let [the-namespace (namespace method)
         the-name      (name method)]
     (keyword (str "slack." the-namespace "." the-name "/" "req"))))
 
-(s/fdef spec-name
+(s/fdef req-spec-name
   :args (s/cat :method :slack/method)
   :ret keyword?)
 
@@ -65,18 +67,18 @@
   corresponding request spec object."
   [method]
   (require 'slack-api.specs.request)
-  (s/get-spec (spec-name method)))
+  (s/get-spec (req-spec-name method)))
 
 (defmulti method-data :slack/method)
 
 ;; Dynamically add multi-methods for each Slack method.
 (doseq [method slack-methods]
-    (. method-data addMethod method
-       (fn [_] (resolve-request-spec method))))
+  (. method-data addMethod method
+     (fn [_] (resolve-request-spec method))))
 
 (s/def :slack/method-data (s/multi-spec method-data :slack/method))
 
-(def ^:private sorting-weights
+(def sorting-weights
   "Map of keywords to integers used to determine the natural sorting
   order of the keys that constitute a `method-descriptor`."
   (apply merge

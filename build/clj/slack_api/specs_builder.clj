@@ -18,7 +18,7 @@
   (->> slack-methods
        (misc/map-vals (comp wrap-in-schema-form #(select-keys % [:slack.req/headers :slack.req/payload :slack.req/query])))
        (map (fn [[method literal-map]]
-              (list 's/def (web-api/spec-name method)
+              (list 's/def (web-api/req-spec-name method)
                     (list 's/schema literal-map))))
        (sort-by second)))
 
