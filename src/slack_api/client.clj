@@ -90,7 +90,7 @@
   [request {:slack.req/keys [headers]}]
   (if-not headers
     request
-    (update :headers #(merge % (walk/stringify-keys headers)))))
+    (update request :headers #(merge % (walk/stringify-keys headers)))))
 
 (defn- preferred-media-type
   "Decides the most suited media type, by choosing between the supplied options.

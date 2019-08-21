@@ -1,5 +1,7 @@
 (ns slack-api.client-test
-  (:require [clojure.spec-alpha2.gen :as gen]
+  (:require [clojure.spec-alpha2 :as s]
+            [matcher-combinators.test :refer [match?]]
+            [clojure.spec-alpha2.gen :as gen]
             [clojure.string :as string]
             [clojure.test :refer :all]
             [clojure.test.check.clojure-test :refer [defspec]]
@@ -65,3 +67,33 @@
            (testing "request parsers can parse arbitrary Clojure maps"
              (is (string?
                   ((client/select-parser client/request-body-parsers content-type) data))))))
+
+(defspec build-http-request-gen-test
+  {:num-tests 75}
+  (for-all [method-data (s/gen :slack/method-data)]
+           (let [{:slack/keys [method]} method-data
+                 method-descriptor      (get (web-api/get-slack-methods) method)]
+             (testing "builds a valid request from arbitrary method-data"
+               (is (map?
+                    (client/build-http-request (merge method-descriptor method-data))))))))
+
+(def method-descriptor
+  {:endpoint/url "https://slack.com/api/this.method"
+   :endpoint/verb :post
+   :endpoint/required-scopes
+   #{"scope"}
+   :endpoint/consumes #{"application/json" "application/x-www-form-urlencoded"}
+   :endpoint/produces #{"application/json"}})
+
+(deftest build-http-request-test
+  (testing "adds the HTTP method and the endpoint's URL to the request"
+    (is (match? {:method :post
+                 :url "https://slack.com/api/this.method"}
+                (client/build-http-request method-descriptor))))
+
+  (testing "adds the content-type and accept headers to the request; always
+    prefers application/json when the endpoint consumes two different media
+    types"
+    (is (match? {:headers {"content-type" "application/json"
+                           "accept" "application/json"}}
+                (client/build-http-request method-descriptor)))))
