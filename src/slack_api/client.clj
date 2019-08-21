@@ -17,21 +17,38 @@
    :keepalive        120000
    :timeout          30000})
 
+(defn form-encoder
+  "Turns a Clojure map into a string in the x-www-form-urlencoded
+  format."
+  [data]
+  (string/join "&"
+               (map (fn [[k v]]
+                      (str (misc/snake-case (name k))
+                           "=" (URLEncoder/encode (str v) "UTF-8")))
+                    data)))
+
 (def json-request-parser
-  #(json/write-str % :key-fn misc/snake-case))
+  "JSON parser for request's bodies."
+  #(json/write-str % :key-fn (comp misc/snake-case name)))
 
 (def json-response-parser
+  "JSON parser for response's bodies."
   (comp #(json/read % :key-fn (comp keyword misc/kebab-case))
         io/reader))
 
 (def request-body-parsers
+  "Map of media types to parser functions."
   {#"^application/json"                  json-request-parser
-   #"^application/x-www-form-urlencoded" identity})
+   #"^application/x-www-form-urlencoded" form-encoder})
 
 (def response-body-parsers
+  "Map of media types to parser functions.
+
+  Notice that currently only application/json is supported by Slack
+  API. It may be extended in the future if needed."
   {#"^application/json" json-response-parser})
 
-(defn- select-parser
+(defn select-parser
   "Selects the most suited parser function in the map m according to the
   supplied media-type."
   [m media-type]
@@ -43,8 +60,8 @@
 (defn- handle-http-response
   [{:keys [status headers body]}]
   (let [normalized-headers (walk/stringify-keys headers)
-        parser-fn (select-parser response-body-parsers (get normalized-headers "content-type"))
-        parsed-body (parser-fn body)]
+        parser-fn          (select-parser response-body-parsers (get normalized-headers "content-type"))
+        parsed-body        (parser-fn body)]
     parsed-body))
 
 (defn get-auth-token
@@ -55,14 +72,9 @@
   "If `:slack.req/query` is given, appends the query string to the
   request url."
   [request {:slack.req/keys [query]}]
-  (let [build-query-string #(string/join "&"
-                                         (map (fn [[k v]]
-                                                (str (misc/snake-case (name k))
-                                                     "=" (URLEncoder/encode (str v) "UTF-8")))
-                                              query))]
-    (if-not query
-      request
-      (update request :url #(str % "?" (build-query-string))))))
+  (if-not query
+    request
+    (update request :url #(str % "?" (form-encoder query)))))
 
 (defn- parse-request-body
   "If `:slack.req/payload` is given, parses it according to the supplied
