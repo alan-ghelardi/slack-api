@@ -78,22 +78,43 @@
                     (client/build-http-request (merge method-descriptor method-data))))))))
 
 (def method-descriptor
-  {:endpoint/url "https://slack.com/api/this.method"
-   :endpoint/verb :post
+  {:endpoint/url      "https://slack.com/api/this.method"
+   :endpoint/verb     :post
    :endpoint/required-scopes
    #{"scope"}
    :endpoint/consumes #{"application/json" "application/x-www-form-urlencoded"}
    :endpoint/produces #{"application/json"}})
 
 (deftest build-http-request-test
+  (testing "the returned request includes some default options"
+    (is (match? client/http-defaults
+                (client/build-http-request method-descriptor))))
+
   (testing "adds the HTTP method and the endpoint's URL to the request"
     (is (match? {:method :post
-                 :url "https://slack.com/api/this.method"}
+                 :url    "https://slack.com/api/this.method"}
                 (client/build-http-request method-descriptor))))
 
   (testing "adds the content-type and accept headers to the request; always
     prefers application/json when the endpoint consumes two different media
     types"
     (is (match? {:headers {"content-type" "application/json"
-                           "accept" "application/json"}}
-                (client/build-http-request method-descriptor)))))
+                           "accept"       "application/json"}}
+                (client/build-http-request method-descriptor))))
+
+  (testing "assoc's additional headers in the request"
+    (is (match? {:headers {"content-type" string?
+                           "token"        "token"}}
+                (client/build-http-request (assoc method-descriptor
+                                                  :slack.req/headers {:token "token"})))))
+
+  (testing "assoc's a parsed body into the request"
+    (is (match? {:body "{\"channel_id\":\"id\"}"}
+                (client/build-http-request (assoc method-descriptor
+                                                  :slack.req/payload {:channel-id "id"})))))
+
+  (testing "appends a query string to the request's URL"
+    (is (match? {:url "https://slack.com/api/this.method?limit=1&exclude_archived=true"}
+                (client/build-http-request (assoc method-descriptor
+                                                  :slack.req/query {:limit            1
+                                                                    :exclude-archived true}))))))

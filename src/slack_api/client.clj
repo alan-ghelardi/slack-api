@@ -87,6 +87,8 @@
            ((select-parser request-body-parsers (get-in request [:headers "content-type"])) payload))))
 
 (defn- add-headers
+  "When :slack.req/headers is present, includes additional headers in
+  the request."
   [request {:slack.req/keys [headers]}]
   (if-not headers
     request
