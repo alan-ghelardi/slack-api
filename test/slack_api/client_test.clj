@@ -1,14 +1,18 @@
 (ns slack-api.client-test
-  (:require [clojure.spec-alpha2 :as s]
-            [matcher-combinators.test :refer [match?]]
+  (:require [clojure.core.async :as async]
+            [clojure.spec-alpha2 :as s]
             [clojure.spec-alpha2.gen :as gen]
             [clojure.string :as string]
             [clojure.test :refer :all]
             [clojure.test.check.clojure-test :refer [defspec]]
             [clojure.test.check.properties :refer [for-all]]
+            [matcher-combinators.matchers :as m]
+            [matcher-combinators.standalone :as standalone]
+            [matcher-combinators.test :refer [match?]]
+            [mockfn.macros :refer [calling providing]]
+            [org.httpkit.client :as httpkit-client]
             [slack-api.client :as client]
-            [slack-api.web-api :as web-api])
-  (:import java.io.StringReader))
+            [slack-api.web-api :as web-api]))
 
 (def custom-keyword-gen
   (gen/fmap #(keyword (string/lower-case (apply str (flatten (interleave (partition 3
@@ -34,12 +38,12 @@
                                         :last-name  "Doe"})))))
 
 (deftest json-response-parser-test
-  (testing "consumes a reader containing a JSON object and converts its content
-  back to a Clojure data structure"
+  (testing "consumes a JSON string and converts it back to a Clojure data
+  structure"
     (is (= {:first-name "John"
             :last-name  "Doe"}
            (client/json-response-parser
-            (StringReader. "{\"first_name\":\"John\",\"last_name\":\"Doe\"}"))))))
+            "{\"first_name\":\"John\",\"last_name\":\"Doe\"}")))))
 
 (defspec json-symmetry-parsers-test
   {:num-tests 50}
@@ -48,8 +52,7 @@
                   (gen/one-of [(gen/string-alphanumeric) (gen/boolean) (gen/int)]))]
            (is (= data
                   (client/json-response-parser
-                   (StringReader.
-                    (client/json-request-parser data)))))))
+                   (client/json-request-parser data))))))
 
 (defspec parsers-test
   {:num-tests 5}
@@ -118,3 +121,37 @@
                 (client/build-http-request (assoc method-descriptor
                                                   :slack.req/query {:limit            1
                                                                     :exclude-archived true}))))))
+
+(deftest handle-http-response-test
+  (testing "takes a HTTP response sent by Slack API and returns the response's
+    body as a Clojure data structure"
+    (is (= {:ok    true
+            :users [{:first-name "John"}]}
+           (client/handle-http-response {:status  200
+                                         :headers {:Content-Type "application/json; charset=UTF-8"}
+                                         :body
+                                         "{\"ok\":true,\"users\":[{\"first_name\":\"John\"}]}"}))))
+
+  (testing "the raw response is available as a metadata in the returned map"
+    (is (match? {:slack.resp/raw
+                 (m/equals {:status  200
+                            :headers {"content-type" string?}
+                            :body    string?})}
+                (meta (client/handle-http-response {:status  200
+                                                    :headers {:Content-Type "application/json; charset=UTF-8"}
+                                                    :body    "{\"ok\":true,\"message\":\"Hello\"}"}))))))
+
+(deftest send-test
+  (let [channel         (async/chan)
+        fake-request-fn (fn [_ callback]
+                          (callback {:status  200
+                                     :headers {:Content-Type "application/json; charset=UTF-8"}
+                                     :body    "{\"ok\":true,\"message\":\"Hello\"}"}))]
+    (providing [(httpkit-client/request (standalone/match? map?) (standalone/match? fn?))
+                (calling fake-request-fn)]
+
+               (testing "sends an asynchronous request to Slack and return a
+               channel containing the response"
+                 (is (= {:ok      true
+                         :message "Hello"}
+                        (async/<!! (client/send channel method-descriptor))))))))

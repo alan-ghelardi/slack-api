@@ -11,7 +11,7 @@
   (:import java.net.URLEncoder))
 
 (def http-defaults
-  {:as               :stream
+  {:as               :text
    :follow-redirects false
    :user-agent       "slack-client"
    :keepalive        120000
@@ -33,8 +33,7 @@
 
 (def json-response-parser
   "JSON parser for response's bodies."
-  (comp #(json/read % :key-fn (comp keyword misc/kebab-case))
-        io/reader))
+  #(json/read-str % :key-fn (comp keyword misc/kebab-case)))
 
 (def request-body-parsers
   "Map of media types to parser functions."
@@ -57,12 +56,27 @@
             v))
         m))
 
-(defn- handle-http-response
-  [{:keys [status headers body]}]
-  (let [normalized-headers (walk/stringify-keys headers)
-        parser-fn          (select-parser response-body-parsers (get normalized-headers "content-type"))
-        parsed-body        (parser-fn body)]
-    parsed-body))
+(defn- normalize-header-names
+  "Given a map containing header names and their values, transforms all
+  keys to downcased strings."
+  [headers]
+  (letfn [(downcase [[k v]]
+            [(string/lower-case (name k)) v])]
+    (walk/postwalk #(if-not (map-entry? %)
+                      %
+                      (downcase %)) headers)))
+
+(defn handle-http-response
+  "Takes a response map sent by the Slack API and returns the response's body as a Clojure data structure.
+
+  The original response (with normalized headers) will be available in
+  the :slack.resp/raw key in the meta of the returned map."
+  [response]
+  (let [{:keys [headers body] :as raw-resp} (dissoc (update response :headers normalize-header-names) :opts)
+        parser-fn                           (select-parser response-body-parsers (get headers "content-type"))
+        resp-data                           (parser-fn body)]
+    (vary-meta resp-data
+               assoc :slack.resp/raw raw-resp)))
 
 (defn get-auth-token
   []
@@ -92,7 +106,7 @@
   [request {:slack.req/keys [headers]}]
   (if-not headers
     request
-    (update request :headers #(merge % (walk/stringify-keys headers)))))
+    (update request :headers #(merge % (normalize-header-names headers)))))
 
 (defn- preferred-media-type
   "Decides the most suited media type, by choosing between the supplied options.
@@ -120,7 +134,8 @@
       (assoc :oauth-token (get-auth-token))))
 
 (defn send
-  "Sends an asynchronous HTTP request to Slack API."
+  "Sends an asynchronous HTTP request to Slack API and returns the
+  channel filled out with the response."
   [channel method-data]
   (httpkit-client/request (build-http-request method-data)
                           #(async/go (>!! channel (handle-http-response %))))
