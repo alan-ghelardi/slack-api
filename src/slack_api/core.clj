@@ -1,11 +1,12 @@
-    (ns slack-api.core
-      "Full featured, data driven, REPL oriented client to Slack Web API."
-      (:refer-clojure :exclude [methods])
-      (:require [clojure.core.async :as async :refer [<!!]]
-                [slack-api.client :as client]
-                [slack-api.errors :as errors]
-                [slack-api.misc :as misc]
-                [slack-api.web-api :as web-api]))
+(ns slack-api.core
+  "Full featured, data driven, REPL oriented client to Slack Web API."
+  (:refer-clojure :exclude [methods])
+  (:require [clojure.core.async :as async :refer [<!!]]
+            [clojure.spec-alpha2 :as s]
+            [slack-api.client :as client]
+            [slack-api.errors :as errors]
+            [slack-api.misc :as misc]
+            [slack-api.web-api :as web-api]))
 
 (defn methods
   "Returns a set containing all known methods exposed by the Slack Web API.
@@ -15,9 +16,21 @@
   []
   (apply sorted-set (keys (web-api/get-slack-methods))))
 
+(s/fdef methods
+  :ret (s/coll-of :slack/method :kind set?))
+
 (defn describe-methods
+  "Returns a map from known Slack methods (qualified keywords) to their
+  descriptions (strings).
+
+  Slack methods are sorted alphabetically to facilitate the
+  visualization in the REPL."
   []
-  (misc/map-vals :doc/description (web-api/get-slack-methods)))
+  (misc/sort-map
+         (misc/map-vals :doc/description (web-api/get-slack-methods))))
+
+(s/fdef describe-methods
+  :ret (s/map-of :slack/method string?))
 
 (defn describe
   "Returns a descriptive data structure for the method in question."
