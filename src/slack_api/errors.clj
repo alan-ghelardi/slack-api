@@ -1,4 +1,4 @@
-(ns slack-api.validator
+(ns slack-api.errors
   (:require [clojure.spec-alpha2 :as s]
             [slack-api.web-api :as web-api]))
 
@@ -16,6 +16,8 @@
 (def ^:private see-available-methods "Tip: call `(slack.core/methods)` or `(slack.core/describe-methods)` to see a comprehensive list of available Slack methods.")
 
 (defn no-such-slack-method
+  "Returns a descriptive data structure explaining that the method in
+  question doesn't exist."
   [method]
   #:slack.errors{:category :slack.errors/no-such-method
                  :message
