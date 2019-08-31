@@ -1,5 +1,8 @@
 (ns slack-api.misc-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.spec-alpha2.gen :as gen]
+            [clojure.test :refer :all]
+            [clojure.test.check.clojure-test :refer [defspec]]
+            [clojure.test.check.properties :refer [for-all]]
             [slack-api.misc :as misc]))
 
 (deftest kebab-case-test
@@ -36,3 +39,12 @@
     {}          {}
     {:a 1}      {:a 2}
     {:a 1 :b 2} {:a 2 :b 3}))
+
+(defspec sort-map-gen-test
+  {:num-tests 25}
+  (for-all [m (gen/map (gen/keyword) (gen/any))]
+           (is (= m (misc/sort-map m))
+               "always returns the same map passed as argument")
+
+           (is (= (some-> m keys sort)
+                  (keys (misc/sort-map m))))))

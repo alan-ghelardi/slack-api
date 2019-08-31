@@ -26,3 +26,8 @@
   [f m]
   (into {} (map (fn [[k v]]
                   [k (f v)]) m)))
+
+(defn sort-map
+  "Returns a sorted view of the map m."
+  [m]
+  (apply sorted-map (mapcat identity (into [] m))))
