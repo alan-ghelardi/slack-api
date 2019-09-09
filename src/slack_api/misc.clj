@@ -28,6 +28,9 @@
                   [k (f v)]) m)))
 
 (defn sort-map
-  "Returns a sorted view of the map m."
-  [m]
-  (apply sorted-map (mapcat identity (into [] m))))
+  "Returns a sorted view of the map m by applying the supplied
+  comparator. If no comparator is supplied, uses compare."
+  ([m]
+   (sort-map compare m))
+  ([comparator m]
+   (apply sorted-map-by comparator (mapcat identity (into [] m)))))

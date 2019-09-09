@@ -47,4 +47,10 @@
                "always returns the same map passed as argument")
 
            (is (= (some-> m keys sort)
-                  (keys (misc/sort-map m))))))
+                  (keys (misc/sort-map m)))
+               "sorts the keys of the map in question by using the default
+               comparator")
+
+           (is (= (misc/sort-map m)
+                  (misc/sort-map compare m))
+               "sorts the map by using the supplied comparator")))
