@@ -10,6 +10,20 @@
   "Converts a string in kebab case to snake case."
   (comp #(string/replace % #"-" "_") string/lower-case))
 
+(defn get-env*
+  "Returns the value of the environment variable in question."
+  [var-name]
+  {:pre [var-name]}
+  (System/getenv var-name))
+
+(defn get-env
+  "Returns the value of the environment variable in question. If the
+  variable is unset or has a blank string as its value, returns nil."
+  [var-name]
+  (when-let [value (get-env* var-name)]
+    (when-not (string/blank? value)
+      value)))
+
 (defn dasherize-keys
   "Recursively applies the kebab-case function to all keys of the map
   m."
