@@ -15,20 +15,20 @@
   (testing "returns a valid map of Slack methods along with their descriptors"
     (is (nil? (s/explain-data :slack/methods (web-api/get-slack-methods))))))
 
-(deftest req-spec-name
+(deftest req-spec-name-test
   (testing "takes a Slack method and returns a request spec name"
     (are [method spec-name] (= spec-name (web-api/req-spec-name method))
       :conversations/archive     :slack.conversations.archive/req
       :admin.users.session/reset :slack.admin.users.session.reset/req)))
 
-(defspec method-data-test
+(defspec method-data-gen-test
   {:num-tests (count (web-api/get-slack-methods))}
   (for-all [method (s/gen :slack/method)]
            (testing "there is a method-data implementation for each existing Slack method"
              (is (fn?
                   (get-method web-api/method-data method))))))
 
-(defspec sort-method-descriptor-test
+(defspec sort-method-descriptor-gen-test
   {:num-tests 25}
   (for-all [method-descriptor (gen/fmap #(assoc % :slack.req/headers {}
                                                 :slack.req/payload {}

@@ -90,8 +90,6 @@
   information contained in the map can be presented in a logical order
   when printed in the REPL."
   [method-descriptor]
-  (->> method-descriptor
-       (into [])
-       (mapcat identity)
-       (apply sorted-map-by #(< (get sorting-weights %1)
-                                (get sorting-weights %2)))))
+  (misc/sort-map #(< (get sorting-weights %1)
+                     (get sorting-weights %2))
+                 method-descriptor))
