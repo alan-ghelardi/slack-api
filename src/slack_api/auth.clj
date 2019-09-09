@@ -3,6 +3,11 @@
             [clojure.java.io :as io]
             [slack-api.misc :as misc]))
 
+(def read-token-from-options
+  "Reads the oauth token by getting the value from the key
+  `:slack.auth/token` in the supplied map."
+  (partial :slack.auth/token))
+
 (defn read-token-from-env
   "Attempts to reads the oauth token from the environment variable
   `SLACK_OAUTH_TOKEN`."
@@ -25,4 +30,12 @@
   []
   (let [credentials-file (io/file (home-dir) ".slack.edn")]
     (when (file-exists? credentials-file)
-      (:slack.auth/token (edn/read-string (slurp credentials-file))))))
+      (read-token-from-options (edn/read-string (slurp credentials-file))))))
+
+(defn get-oauth-token
+  [options]
+  (some #(when-let [oauth-token (%)]
+           oauth-token)
+        [(partial read-token-from-options options)
+         read-token-from-env
+         read-token-from-edn-file]))
