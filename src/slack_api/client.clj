@@ -3,10 +3,10 @@
   (:refer-clojure :exclude [send])
   (:require [clojure.core.async :as async :refer [>!!]]
             [clojure.data.json :as json]
-            [clojure.java.io :as io]
             [clojure.string :as string]
             [clojure.walk :as walk]
             [org.httpkit.client :as httpkit-client]
+            [slack-api.auth :as auth]
             [slack-api.misc :as misc])
   (:import java.net.URLEncoder))
 
@@ -78,10 +78,6 @@
     (vary-meta resp-data
                assoc :slack.resp/raw raw-resp)))
 
-(defn get-auth-token
-  []
-  (slurp (io/file (System/getProperty "user.home") ".slack-token")))
-
 (defn- add-query-string
   "If `:slack.req/query` is given, appends the query string to the
   request url."
@@ -131,7 +127,7 @@
       (add-headers method-data)
       (parse-request-body method-data)
       (add-query-string method-data)
-      (assoc :oauth-token (get-auth-token))))
+      (assoc :oauth-token (auth/get-oauth-token method-data))))
 
 (defn send
   "Sends an asynchronous HTTP request to Slack API and returns the
