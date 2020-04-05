@@ -118,6 +118,16 @@
     request
     (update request :headers #(merge % (normalize-header-names headers)))))
 
+(defn- add-oauth-token
+  "Adds the oauth token header to the request if there is a token
+  declared in one of the sources expected by slack.auth/read-oauth-token
+  function."
+  [request method-data]
+  (if-let [oauth-token (auth/read-oauth-token method-data)]
+    (assoc-in request [:headers "authorization"]
+              (str "Bearer " oauth-token))
+    request))
+
 (defn- preferred-media-type
   "Decides the most suited media type, by choosing between the supplied options.
 
@@ -138,10 +148,10 @@
        :headers {"content-type" (preferred-media-type consumes)
                  "accept"       (preferred-media-type produces)}}
       (merge http-defaults)
+      (add-oauth-token method-data)
       (add-headers method-data)
       (parse-request-body method-data)
-      (add-query-string method-data)
-      (assoc :oauth-token (auth/get-oauth-token method-data))))
+      (add-query-string method-data)))
 
 (defn send
   "Sends an asynchronous HTTP request to Slack API and returns the

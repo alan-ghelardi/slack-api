@@ -32,7 +32,7 @@
     (when (file-exists? credentials-file)
       (read-token-from-options (edn/read-string (slurp credentials-file))))))
 
-(defn get-oauth-token
+(defn read-oauth-token
   [options]
   (some #(when-let [oauth-token (%)]
            oauth-token)

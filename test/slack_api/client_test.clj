@@ -11,6 +11,7 @@
             [matcher-combinators.test :refer [match?]]
             [mockfn.macros :refer [calling providing]]
             [org.httpkit.client :as httpkit-client]
+            [slack-api.auth :as auth]
             [slack-api.client :as client]
             [slack-api.web-api :as web-api]))
 
@@ -105,11 +106,16 @@
                            "accept"       "application/json"}}
                 (client/build-http-request method-descriptor))))
 
+  (testing "adds the oauth token to the request headers"
+    (providing [(auth/read-oauth-token method-descriptor) "token"]
+               (is (match? {:headers {"authorization" "Bearer token"}}
+                           (client/build-http-request method-descriptor)))))
+
   (testing "assoc's additional headers in the request"
-    (is (match? {:headers {"content-type" string?
-                           "token"        "token"}}
+    (is (match? {:headers {"content-type"     string?
+                           "x-correlation-id" "value"}}
                 (client/build-http-request (assoc method-descriptor
-                                                  :slack.req/headers {:token "token"})))))
+                                                  :slack.req/headers {:X-Correlation-Id "value"})))))
 
   (testing "assoc's a parsed body into the request"
     (is (match? {:body "{\"channel_id\":\"id\"}"}
@@ -142,7 +148,7 @@
                                                     :body    "{\"ok\":true,\"message\":\"Hello\"}"})))))
 
   (testing "when response contains an :error value, returns a data structure describing the problem"
-    (is (match? #:slack.errors{:category :slack.errors/unexpected-error
+    (is (match? #:slack.errors{:category  :slack.errors/unexpected-error
                                :throwable #(instance? Throwable %)}
                 (client/handle-http-response {:error (Exception. "Connection timeout")})))))
 
