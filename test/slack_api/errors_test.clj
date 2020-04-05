@@ -30,7 +30,7 @@
         "this method doesn't exist")
 
     (is (match? {:slack.errors/category :slack.errors/malformed-data}
-                (errors/validate-method-data {:slack/method       :api/test
+                (errors/validate-method-data {:slack/method    :api/test
                                               :slack.req/query {:foo 42}}))
         "foo must be a string"))
 
@@ -40,6 +40,13 @@
                                (m/in-any-order ['(expected string? got 42 at [:slack.req/query :foo])
                                                 '(expected string? got true at [:slack.req/query :error])])}
 
-                (errors/validate-method-data {:slack/method       :api/test
+                (errors/validate-method-data {:slack/method    :api/test
                                               :slack.req/query {:foo   42
                                                                 :error true}})))))
+
+(deftest unexpected-error-test
+  (let [throwable (Exception. "Error!")]
+    (is (= #:slack.errors{:category  :slack.errors/unexpected-error
+                          :message   "Something bad happened"
+                          :throwable throwable}
+           (errors/unexpected-error "Something bad happened" throwable)))))

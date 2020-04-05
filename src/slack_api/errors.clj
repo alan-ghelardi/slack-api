@@ -4,14 +4,17 @@
 
 (s/def :slack.errors/category #{:slack.errors/missing-method
                                 :slack.errors/no-such-method
-                                :slack.errors/malformed-data})
+                                :slack.errors/malformed-data
+                                :slack.errors/unexpected-error})
 
 (s/def :slack.errors/message string?)
 
 (s/def :slack.errors/problems (s/coll-of list? :kind vector? :min-count 1))
 
+(s/def :slack.errors/throwable #(instance? Throwable %))
+
 (s/def :slack.errors/validation-error (s/keys :req [:slack.errors/category :slack.errors/message]
-                                              :opt [:slack.errors/problems]))
+                                              :opt [:slack.errors/problems :slack.errors/throwable]))
 
 (def ^:private see-available-methods "Tip: call `(slack.core/methods)` or `(slack.core/describe-methods)` to see a comprehensive list of available Slack methods.")
 
@@ -91,3 +94,12 @@
   :args (s/cat :method-data :slack/method-data)
   :ret (s/or :ok :slack/method-data
              :error :slack.errors/validation-error))
+
+(defn unexpected-error
+  "Returns a data structure representing an arbitrary and unexpected
+  error."
+  [^String message ^Throwable error]
+  #:slack.errors{:category  :slack.errors/unexpected-error
+                 :message   message
+                 :throwable error}
+  )
