@@ -4,7 +4,7 @@
   org.clojure/core.async  #:mvn {:version "0.4.500"}
   org.clojure/data.json   #:mvn {:version "0.2.6"}
   org.clojure/spec-alpha2 {:git/url "https://github.com/clojure/spec-alpha2.git" :sha "6af1f372465da4f39c0662d7d19acf813d84d03b"}
-  http-kit                #:mvn {:version "2.3.0"}}
+  http-kit                #:mvn {:version "2.4.0-alpha6"}}
 
  :aliases {:build {:extra-paths ["build/clj"]}
            :dev   {:extra-paths ["build/clj" "dev-resources" "test"]
