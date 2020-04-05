@@ -139,7 +139,12 @@
                             :body    string?})}
                 (meta (client/handle-http-response {:status  200
                                                     :headers {:Content-Type "application/json; charset=UTF-8"}
-                                                    :body    "{\"ok\":true,\"message\":\"Hello\"}"}))))))
+                                                    :body    "{\"ok\":true,\"message\":\"Hello\"}"})))))
+
+  (testing "when response contains an :error value, returns a data structure describing the problem"
+    (is (match? #:slack.errors{:category :slack.errors/unexpected-error
+                               :throwable #(instance? Throwable %)}
+                (client/handle-http-response {:error (Exception. "Connection timeout")})))))
 
 (deftest send-test
   (let [channel         (async/chan)

@@ -7,11 +7,22 @@
             [clojure.walk :as walk]
             [org.httpkit.client :as httpkit-client]
             [slack-api.auth :as auth]
+            [slack-api.errors :as errors]
             [slack-api.misc :as misc])
-  (:import java.net.URLEncoder))
+  (:import [java.net URI URLEncoder]
+           [javax.net.ssl SNIHostName SSLEngine SSLParameters]))
+
+(defn- ssl-configurer
+  "Configures the SSL engine to enable server name indication (SNI)."
+  [^SSLEngine ssl-engine ^URI uri]
+  (let [^SSLParameters ssl-params (.getSSLParameters ssl-engine)]
+    (.setServerNames ssl-params [(SNIHostName. (.getHost uri))])
+    (.setUseClientMode ssl-engine true)
+    (.setSSLParameters ssl-engine ssl-params)))
 
 (def http-defaults
   {:as               :text
+   :client           (httpkit-client/make-client {:ssl-configurer ssl-configurer})
    :follow-redirects false
    :user-agent       "slack-client"
    :keepalive        120000
@@ -72,11 +83,14 @@
   The original response (with normalized headers) will be available in
   the :slack.resp/raw key in the meta of the returned map."
   [response]
-  (let [{:keys [headers body] :as raw-resp} (dissoc (update response :headers normalize-header-names) :opts)
-        parser-fn                           (select-parser response-body-parsers (get headers "content-type"))
-        resp-data                           (parser-fn body)]
-    (vary-meta resp-data
-               assoc :slack.resp/raw raw-resp)))
+  (if (:error response)
+    (errors/unexpected-error "Unexpected HTTP error when trying to call Slack API" (:error response))
+
+    (let [{:keys [headers body] :as raw-resp} (dissoc (update response :headers normalize-header-names) :opts)
+          parser-fn                           (select-parser response-body-parsers (get headers "content-type"))
+          resp-data                           (parser-fn body)]
+      (vary-meta resp-data
+                 assoc :slack.resp/raw raw-resp))))
 
 (defn- add-query-string
   "If `:slack.req/query` is given, appends the query string to the
