@@ -2,6 +2,8 @@
   "Full featured, data driven, REPL oriented client to Slack Web API."
   (:refer-clojure :exclude [methods])
   (:require [clojure.core.async :as async :refer [<!!]]
+            [clojure.edn :as edn]
+            [clojure.java.io :as io]
             [clojure.spec-alpha2 :as s]
             [slack-api.client :as client]
             [slack-api.errors :as errors]
@@ -27,7 +29,7 @@
   visualization in the REPL."
   []
   (misc/sort-map
-         (misc/map-vals :doc/description (web-api/get-slack-methods))))
+   (misc/map-vals :doc/description (web-api/get-slack-methods))))
 
 (s/fdef describe-methods
   :ret (s/map-of :slack/method string?))
@@ -39,10 +41,30 @@
     (web-api/sort-method-descriptor descriptor)
     (errors/no-such-slack-method method)))
 
+(s/fdef describe
+  :args (s/cat :method :slack/method)
+  :ret :slack/method-descriptor)
+
+(defn- read-oauth-token
+  "Attempts to read the oauth token to access the Slack API from a file
+  named .slack.edn at the user's home directory."
+  []
+  (let [credentials (io/file (misc/home-dir) ".slack.edn")]
+    (when (misc/file-exists? credentials)
+      (:slack.auth/oauth-token (edn/read-string (slurp credentials))))))
+
+(def ^:private default-client-opts
+  "Default options to control the Slack client behavior."
+  {:oauth-token-fn read-oauth-token
+
+   :throw-errors? false})
+
 (defn- build-input-data
   [{:slack/keys [method] :as method-data}]
   (let [method-descriptor (dissoc (get (web-api/get-slack-methods) method) :slack.req/headers :slack.req/payload :slack.req/query)]
-    (merge method-descriptor method-data)))
+    (update
+     (merge method-descriptor method-data)
+     :slack.client/opts #(merge % default-client-opts))))
 
 (defn call-async
   [method-data]
@@ -53,9 +75,24 @@
       (client/send output-channel (build-input-data method-data)))
     output-channel))
 
+(defn- throw-error
+  "Given a result data representing a preflight error or a
+  non-successful response from the Slack API, throws an exception info
+  explaining what went wrong."
+  [result]
+  (throw (ex-info (if (errors/validation-error? result)
+                    "Preflight error"
+                    "Slack API returned an error")
+                  result)))
+
 (defn call
   [method-data]
-  (<!! (call-async method-data)))
+  (let [result (<!! (call-async method-data))]
+    (if (and (get-in method-data [:slack.client/opts :throw-errors?])
+             (or (errors/validation-error? result)
+                 (not (:ok result))))
+      (throw-error result)
+      result)))
 
 (comment
   (call {:slack/method    :conversations/list

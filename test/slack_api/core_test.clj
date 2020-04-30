@@ -15,6 +15,11 @@
                             (slack/describe-methods)))))
 
 (deftest describe-test
+  (testing "method descriptor always conform to the spec"
+    (is (every?
+         #(nil? (s/explain-data :slack/method-descriptor (slack/describe %)))
+                (slack/methods))))
+
   (testing "returns an error when the method doesn't exist"
     (is (match? {:slack.errors/category :slack.errors/no-such-method}
                 (slack/describe :foo/bar)))))
