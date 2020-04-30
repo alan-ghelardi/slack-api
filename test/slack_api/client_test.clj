@@ -11,7 +11,6 @@
             [matcher-combinators.test :refer [match?]]
             [mockfn.macros :refer [calling providing]]
             [org.httpkit.client :as httpkit-client]
-            [slack-api.auth :as auth]
             [slack-api.client :as client]
             [slack-api.web-api :as web-api]))
 
@@ -107,9 +106,9 @@
                 (client/build-http-request method-descriptor))))
 
   (testing "adds the oauth token to the request headers"
-    (providing [(auth/read-oauth-token method-descriptor) "token"]
-               (is (match? {:headers {"authorization" "Bearer token"}}
-                           (client/build-http-request method-descriptor)))))
+    (is (match? {:headers {"authorization" "Bearer token"}}
+                (client/build-http-request (assoc method-descriptor
+                                                  :slack.client/opts {:oauth-token-fn (constantly "token")})))))
 
   (testing "assoc's additional headers in the request"
     (is (match? {:headers {"content-type"     string?
