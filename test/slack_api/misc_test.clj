@@ -1,9 +1,9 @@
 (ns slack-api.misc-test
-  (:require [clojure.spec-alpha2.gen :as gen]
+  (:require [clojure.java.io :as io]
+            [clojure.spec-alpha2.gen :as gen]
             [clojure.test :refer :all]
             [clojure.test.check.clojure-test :refer [defspec]]
             [clojure.test.check.properties :refer [for-all]]
-            [mockfn.macros :refer [providing]]
             [slack-api.misc :as misc]))
 
 (deftest kebab-case-test
@@ -29,19 +29,12 @@
   (is (= "my_first_name"
          (misc/snake-case (misc/kebab-case "my_first_name")))))
 
-(deftest get-env-test
-  (testing "returns the value of the environment variable"
-    (providing [(misc/get-env* "USER") "john-doe"]
-               (is (= "john-doe"
-                      (misc/get-env "USER")))))
+(deftest file-exists-test
+  (is (true? (misc/file-exists? (io/file "deps.edn"))))
+  (is (false? (misc/file-exists? (io/file "foo.edn")))))
 
-  (testing "returns nil when the environment variable is unset"
-    (providing [(misc/get-env* "PATH") nil]
-               (is (nil? (misc/get-env "PATH")))))
-
-  (testing "returns nil when the environment variable has a blank string as its value"
-    (providing [(misc/get-env* "PATH") " "]
-               (is (nil? (misc/get-env "PATH"))))))
+(deftest home-dir-test
+  (is (true? (misc/file-exists? (misc/home-dir)))))
 
 (deftest dasherize-keys-test
   (is (= {:relevant-channels [{:name-normalized "channel1"}
