@@ -64,7 +64,7 @@
   (let [method-descriptor (dissoc (get (web-api/get-slack-methods) method) :slack.req/headers :slack.req/payload :slack.req/query)]
     (update
      (merge method-descriptor method-data)
-     :slack.client/opts #(merge % default-client-opts))))
+     :slack.client/opts (partial merge default-client-opts))))
 
 (defn call-async
   [method-data]
