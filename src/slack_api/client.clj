@@ -6,7 +6,6 @@
             [clojure.string :as string]
             [clojure.walk :as walk]
             [org.httpkit.client :as httpkit-client]
-            [slack-api.auth :as auth]
             [slack-api.errors :as errors]
             [slack-api.misc :as misc])
   (:import [java.net URI URLEncoder]
@@ -120,13 +119,14 @@
 
 (defn- add-oauth-token
   "Adds the oauth token header to the request if there is a token
-  declared in one of the sources expected by slack.auth/read-oauth-token
-  function."
+  function declared at [:slack.client/opts :oauth-token-fn] in the
+  method-data."
   [request method-data]
-  (if-let [oauth-token (auth/read-oauth-token method-data)]
-    (assoc-in request [:headers "authorization"]
-              (str "Bearer " oauth-token))
-    request))
+  (let [oauth-token-fn (get-in method-data [:slack.client/opts :oauth-token-fn] (constantly nil))]
+    (if-let [oauth-token (oauth-token-fn)]
+      (assoc-in request [:headers "authorization"]
+                (str "Bearer " oauth-token))
+      request)))
 
 (defn- preferred-media-type
   "Decides the most suited media type, by choosing between the supplied options.

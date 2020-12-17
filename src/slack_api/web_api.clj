@@ -11,7 +11,7 @@
   "slack_api/web_api.edn")
 
 (def ^:private read-web-api*
-  (comp edn/read-string slurp io/resource))
+  (comp edn/read-string slurp io/input-stream io/resource))
 
 (def read-web-api
   "Memoized reader for the web_api.edn descriptor."

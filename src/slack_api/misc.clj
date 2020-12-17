@@ -1,6 +1,8 @@
 (ns slack-api.misc
-  (:require [clojure.string :as string]
-            [clojure.walk :as walk]))
+  (:require [clojure.java.io :as io]
+            [clojure.string :as string]
+            [clojure.walk :as walk])
+  (:import java.io.File))
 
 (def kebab-case
   "Converts a string in camel or snake case to kebap case."
@@ -10,19 +12,15 @@
   "Converts a string in kebab case to snake case."
   (comp #(string/replace % #"-" "_") string/lower-case))
 
-(defn get-env*
-  "Returns the value of the environment variable in question."
-  [var-name]
-  {:pre [var-name]}
-  (System/getenv var-name))
+(defn file-exists?
+  "Returns true if the file exists or false otherwise."
+  [^File file]
+  (.exists file))
 
-(defn get-env
-  "Returns the value of the environment variable in question. If the
-  variable is unset or has a blank string as its value, returns nil."
-  [var-name]
-  (when-let [value (get-env* var-name)]
-    (when-not (string/blank? value)
-      value)))
+(defn ^File home-dir
+  "Returns a file object representing the user's home dir."
+  []
+  (io/file (System/getProperty "user.home")))
 
 (defn dasherize-keys
   "Recursively applies the kebab-case function to all keys of the map
